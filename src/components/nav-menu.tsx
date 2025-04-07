@@ -1,9 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-
 import Link from "next/link";
 import * as React from "react";
 
@@ -17,6 +13,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
+import { ModeToggle } from "./mode-toggle";
 
 const components: { title: string; href: string; description: string }[] = [
   {
@@ -56,7 +53,6 @@ const components: { title: string; href: string; description: string }[] = [
 ];
 
 export function NavigationMenuDemo() {
-  const { theme, setTheme } = useTheme();
   return (
     <div className="flex w-full">
       <NavigationMenu className="z-20">
@@ -113,14 +109,7 @@ export function NavigationMenuDemo() {
         </NavigationMenuList>
       </NavigationMenu>
       <div className="flex items-center gap-2 px-4 ml-auto">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+        <ModeToggle />
       </div>
     </div>
   );

@@ -32,7 +32,6 @@ export default function AppBreadCrumb() {
       <BreadcrumbList>
         {crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;
-          console.log({ crumb, index });
           return (
             <React.Fragment key={crumb.href}>
               <BreadcrumbItem>

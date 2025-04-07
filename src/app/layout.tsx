@@ -69,7 +69,7 @@ export default function RootLayout({
                 <AppBreadCrumb />
               </header>
               <ScrollArea className="h-[calc(100svh-theme(spacing.4)-(4rem*2))]">
-                {children}
+                <div className="p-2">{children}</div>
               </ScrollArea>
             </SidebarInset>
           </SidebarProvider>
