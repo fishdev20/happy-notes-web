@@ -1,5 +1,6 @@
 "use client";
 import { NoteLayout } from "@/@types/models/Note";
+import Chatbot from "@/components/note/chat-bot";
 import NoteDiff from "@/components/note/note-diff";
 import NoteEditor from "@/components/note/note-editor";
 import NotePreview from "@/components/note/note-preview";
@@ -27,6 +28,7 @@ export default function AddNote() {
         <NoteDiff value={markdownContent} onChange={handleChange} />
       )}
       {activeNoteLayout === NoteLayout.PREVIEW && <NotePreview markdownContent={markdownContent} />}
+      <Chatbot />
     </div>
   );
 }
