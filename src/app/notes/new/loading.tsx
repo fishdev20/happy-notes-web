@@ -1,4 +1,3 @@
 export default async function Loading() {
-  console.log("loading");
   return <div className="p-4">LOADING...</div>;
 }

@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Image from "next/image";
+import { Suspense } from "react";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -51,7 +52,6 @@ export default function RootLayout({
         >
           <header className="flex h-[4rem] shrink-0 items-center gap-2 border-b px-4">
             <Image
-              className="dark:invert"
               src="https://cdn6.aptoide.com/imgs/5/7/4/574859cec3b8da1781b67ccc76c26d4f_icon.png"
               alt="Next.js logo"
               width={45}
@@ -69,7 +69,9 @@ export default function RootLayout({
                 <AppBreadCrumb />
               </header>
               <ScrollArea className="h-[calc(100svh-theme(spacing.4)-(4rem*2))]">
-                <div className="p-2">{children}</div>
+                <div className="p-2">
+                  <Suspense fallback={<>Loading...</>}>{children}</Suspense>
+                </div>
               </ScrollArea>
             </SidebarInset>
           </SidebarProvider>
