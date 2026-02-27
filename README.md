@@ -1,40 +1,49 @@
+# Happy Notes Web
 
-[screen-capture.webm](https://github.com/user-attachments/assets/2cf6a797-f677-4f12-a38e-de0b414618ff)
+Happy Notes is a markdown-first journaling app built with Next.js and Zustand.
 
+## Features
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+- Markdown editor with source, diff, and preview modes
+- Local persistent storage for notes
+- Note lifecycle management: active, archived, trash
+- Calendar view by note update date
+- In-editor markdown helper chatbot commands
+- Light and dark themes
 
-## Getting Started
+## Tech Stack
 
-First, run the development server:
+- Next.js 15 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- Zustand (with persistence middleware)
+- shadcn/ui + Radix UI
+
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quality Gates
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+```
 
-## Learn More
+## Production Run
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes About Data
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Notes are stored in browser `localStorage` under the key `happy-notes-store`.
+- This is client-side persistence only. Add a backend datastore if you need multi-device sync.

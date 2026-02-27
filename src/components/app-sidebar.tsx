@@ -2,6 +2,8 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -27,12 +29,12 @@ import {
 const items = [
   {
     title: "Home",
-    url: "/",
+    url: "/home",
     icon: Home,
   },
   {
     title: "Notes",
-    url: "", // We'll detect activity via submenus
+    url: "/notes",
     icon: SquarePen,
     submenus: [
       {
@@ -67,110 +69,110 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open } = useSidebar();
   const [isNotesOpen, setIsNotesOpen] = React.useState(pathname.startsWith("/notes"));
 
-  // React.useEffect(() => {
-  //   if (pathname.includes("/notes")) {
-  //     setIsNotesOpen(true);
-  //   } else {
-  //     setIsNotesOpen(false);
-  //   }
-  // }, [pathname]);
+  React.useEffect(() => {
+    setIsNotesOpen(pathname.startsWith("/notes"));
+  }, [pathname]);
 
   return (
     <Sidebar className="top-[4rem]" variant="inset" {...props} collapsible="icon">
       <SidebarHeader></SidebarHeader>
       <SidebarContent>
-        <SidebarMenu>
-          {items.map((item) => {
-            const isSubmenuActive = item.submenus?.some((submenu) =>
-              pathname.startsWith(submenu.url),
-            );
-            const isActive = pathname === item.url || isSubmenuActive;
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {items.map((item) => {
+                const isSubmenuActive = item.submenus?.some((submenu) =>
+                  pathname.startsWith(submenu.url),
+                );
+                const isActive = pathname === item.url || isSubmenuActive;
 
-            if (item.submenus) {
-              return (
-                <div key={item.title}>
-                  {!open ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                            <Link href={`${item.url}`}>
-                              <item.icon />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-56" side="right">
-                        {item.submenus.map((sub) => {
-                          return (
-                            <DropdownMenuItem
-                              asChild
-                              key={sub.url}
-                              className={pathname === sub.url ? "bg-muted text-primary" : ""}
-                            >
-                              <Link href={`${sub.url}`}>
-                                <span>{sub.title}</span>
-                              </Link>
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <SidebarMenuItem key={item.title}>
-                      <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
-                        <CollapsibleTrigger asChild className="cursor-pointer">
-                          <SidebarMenuButton
-                            className="flex items-center justify-between w-full"
-                            tooltip={item.title}
-                            isActive={isActive}
-                          >
-                            <item.icon />
-                            <span>{item.title}</span>
-                            <ChevronRight
-                              className={`ml-auto transition-transform duration-200 ${isNotesOpen ? "rotate-90" : ""}`}
-                            />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                          <SidebarMenuSub>
-                            {item.submenus.map((submenu) => {
-                              const isSubmenuSelected = pathname === submenu.url;
+                if (item.submenus) {
+                  return (
+                    <div key={item.title}>
+                      {!open ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                                <Link href={`${item.url}`}>
+                                  <item.icon />
+                                  <span>{item.title}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56" side="right">
+                            {item.submenus.map((sub) => {
                               return (
-                                <SidebarMenuSubItem key={submenu.url}>
-                                  <SidebarMenuSubButton asChild isActive={isSubmenuSelected}>
-                                    <Link href={submenu.url} className="w-full">
-                                      <span>
-                                        <Dot size={18} />
-                                      </span>
-                                      <span>{submenu.title}</span>
-                                    </Link>
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
+                                <DropdownMenuItem
+                                  asChild
+                                  key={sub.url}
+                                  className={pathname === sub.url ? "bg-muted text-primary" : ""}
+                                >
+                                  <Link href={`${sub.url}`}>
+                                    <span>{sub.title}</span>
+                                  </Link>
+                                </DropdownMenuItem>
                               );
                             })}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </Collapsible>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <SidebarMenuItem key={item.title}>
+                          <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+                            <CollapsibleTrigger asChild className="cursor-pointer">
+                              <SidebarMenuButton
+                                className="flex items-center justify-between w-full"
+                                tooltip={item.title}
+                                isActive={isActive}
+                              >
+                                <item.icon />
+                                <span>{item.title}</span>
+                                <ChevronRight
+                                  className={`ml-auto transition-transform duration-200 ${isNotesOpen ? "rotate-90" : ""}`}
+                                />
+                              </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                              <SidebarMenuSub>
+                                {item.submenus.map((submenu) => {
+                                  const isSubmenuSelected = pathname === submenu.url;
+                                  return (
+                                    <SidebarMenuSubItem key={submenu.url}>
+                                      <SidebarMenuSubButton asChild isActive={isSubmenuSelected}>
+                                        <Link href={submenu.url} className="w-full">
+                                          <span>
+                                            <Dot size={18} />
+                                          </span>
+                                          <span>{submenu.title}</span>
+                                        </Link>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  );
+                                })}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </SidebarMenuItem>
+                      )}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                        <Link href={`${item.url}`}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
                     </SidebarMenuItem>
-                  )}
-                </div>
-              );
-            } else {
-              return (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                    <Link href={`${item.url}`}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            }
-          })}
-        </SidebarMenu>
+                  );
+                }
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

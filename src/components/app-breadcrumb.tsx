@@ -16,8 +16,20 @@ export default function AppBreadCrumb() {
   // Split path and filter out empty segments
   const segments = pathname.split("/").filter(Boolean);
 
-  // Initialize breadcrumbs with "Home" for the root path
-  const crumbs = [{ name: "Home", href: "/" }];
+  if (pathname === "/") {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink aria-current="page">Landing</BreadcrumbLink>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
+  // Initialize breadcrumbs with "Home" for workspace routes
+  const crumbs = [{ name: "Home", href: "/home" }];
 
   // Add path segments as crumbs if not at the root
   if (segments.length > 0) {

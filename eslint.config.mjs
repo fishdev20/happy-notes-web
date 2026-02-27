@@ -1,4 +1,6 @@
 import { FlatCompat } from "@eslint/eslintrc";
+import prettierConfig from "eslint-config-prettier";
+import prettierPlugin from "eslint-plugin-prettier";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 

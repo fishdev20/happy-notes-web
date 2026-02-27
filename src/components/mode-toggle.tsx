@@ -1,12 +1,17 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MoonIcon, SunIcon } from "lucide-react";
 
-export function ModeToggle() {
+type ModeToggleProps = {
+  className?: string;
+};
+
+export function ModeToggle({ className }: ModeToggleProps) {
   const { setTheme, theme } = useTheme();
 
   return (
@@ -14,7 +19,7 @@ export function ModeToggle() {
       <Tooltip delayDuration={100}>
         <TooltipTrigger asChild>
           <Button
-            className="rounded-sm bg-background mr-2"
+            className={cn("rounded-sm bg-background", className)}
             variant="outline"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

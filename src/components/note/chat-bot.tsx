@@ -1,197 +1,316 @@
+"use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import useNoteStore from "@/store/use-note-store";
-import { Bot, Send, User } from "lucide-react";
+import { Bot, Eraser, Send, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TypingIndicator } from "../typing-indicator";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
+type ChatMessage = {
+  sender: "chatbot" | "user";
+  text: string;
+};
+
+type CommandResult = {
+  response: string;
+  markdownToInsert?: string;
+  markdownMode?: "append" | "replace";
+};
+
+const quickCommands = ["/help", "/summarize", "/title", "/todo 5", "/template daily", "/tags"];
+
+const commandDocs = [
+  { command: "/help", description: "Show available commands." },
+  { command: "/summarize", description: "Summarize current note into bullet points." },
+  { command: "/title", description: "Suggest a title from note content." },
+  { command: "/tags", description: "Suggest 3-5 lightweight tags." },
+  { command: "/todo [count]", description: "Create checklist from note, default 5 items." },
+  { command: "/template [daily|meeting|journal]", description: "Insert structured template." },
+  { command: "/continue", description: "Generate a continuation paragraph for current note." },
+  { command: "/shorten", description: "Rewrite note to a shorter version." },
+  { command: "/replace <find> => <replace>", description: "Replace text in note content." },
+  { command: "/clear", description: "Clear chatbot conversation." },
+];
+
+const introMessage: ChatMessage = {
+  sender: "chatbot",
+  text: "I can help shape your note. Try /help or tap a quick command below.",
+};
+
+const fallbackText = "No note content yet. Start writing and I can help transform it.";
+
+const toWords = (value: string) => value.trim().split(/\s+/).filter(Boolean);
+
+const toSentences = (value: string) =>
+  (value.match(/[^.!?]+[.!?]*/g) ?? []).map((line) => line.trim()).filter(Boolean);
+
+const toLines = (value: string) =>
+  value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const deriveTags = (content: string) => {
+  const stopWords = new Set([
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "for",
+    "nor",
+    "on",
+    "in",
+    "with",
+    "to",
+    "of",
+    "is",
+    "are",
+    "be",
+    "this",
+    "that",
+    "it",
+    "as",
+    "by",
+    "at",
+    "from",
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const token of content.toLowerCase().match(/[a-z0-9-]+/g) ?? []) {
+    if (token.length < 4 || stopWords.has(token)) {
+      continue;
+    }
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([word]) => word);
+};
+
+const deriveTitle = (content: string) => {
+  const heading = content
+    .split("\n")
+    .find((line) => line.trim().startsWith("#"))
+    ?.replace(/^#+\s*/, "")
+    .trim();
+
+  if (heading) {
+    return heading;
+  }
+
+  const firstSentence = toSentences(content)[0];
+  if (!firstSentence) {
+    return "Untitled note";
+  }
+
+  const words = toWords(firstSentence).slice(0, 8);
+  return words.join(" ").replace(/[^\w)\]]$/, "");
+};
+
+const summarize = (content: string) => {
+  const lines = toLines(content);
+  if (!lines.length) {
+    return fallbackText;
+  }
+
+  const keyPoints = lines.slice(0, 5).map((line) => `- ${line}`);
+  return ["Summary:", ...keyPoints].join("\n");
+};
+
+const generateTemplate = (variant: string) => {
+  switch (variant) {
+    case "daily":
+      return `# Daily Note\n\n## Focus\n- \n\n## Wins\n- \n\n## Challenges\n- \n\n## Next Step\n- `;
+    case "meeting":
+      return `# Meeting Notes\n\n## Agenda\n- \n\n## Decisions\n- \n\n## Action Items\n- [ ] `;
+    case "journal":
+      return `# Journal Entry\n\n## How I feel\n\n## What happened\n\n## What I learned\n\n## Tomorrow's intention`;
+    default:
+      return `Unknown template "${variant}". Use: daily, meeting, journal.`;
+  }
+};
+
+const createTodo = (content: string, count: number) => {
+  const lines = toLines(content);
+  if (!lines.length) {
+    return ["- [ ] First task", "- [ ] Second task"];
+  }
+  return lines
+    .slice(0, count)
+    .map((line) => line.replace(/^[-*]\s+/, ""))
+    .map((line) => `- [ ] ${line}`);
+};
+
+const continueParagraph = (content: string) => {
+  const lastSentence = toSentences(content).slice(-1)[0];
+  if (!lastSentence) {
+    return "I am just getting started, and I want to build momentum with one clear next action.";
+  }
+  return `Building on that, the next practical step is to turn "${lastSentence.replace(/"/g, "'")}" into a concrete action with a deadline and owner.`;
+};
+
+const shortenContent = (content: string) => {
+  const sentences = toSentences(content);
+  if (!sentences.length) {
+    return fallbackText;
+  }
+
+  const keepCount = Math.max(1, Math.ceil(sentences.length / 3));
+  return sentences.slice(0, keepCount).join(" ");
+};
+
+const parseReplace = (args: string) => {
+  const parts = args.split("=>").map((part) => part.trim());
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+  return { findValue: parts[0], replaceValue: parts[1] };
+};
+
+const executeCommand = (input: string, markdownContent: string): CommandResult => {
+  const [command, ...restArgs] = input.trim().split(/\s+/);
+  const args = restArgs.join(" ").trim();
+  const normalized = command.toLowerCase();
+
+  if (normalized === "/help") {
+    return {
+      response: [
+        "Available commands:",
+        ...commandDocs.map((item) => `- ${item.command}: ${item.description}`),
+      ].join("\n"),
+    };
+  }
+
+  if (normalized === "/clear") {
+    return { response: "Conversation cleared." };
+  }
+
+  if (normalized === "/summarize") {
+    const summary = summarize(markdownContent);
+    return { response: summary, markdownToInsert: summary, markdownMode: "append" };
+  }
+
+  if (normalized === "/title") {
+    const title = deriveTitle(markdownContent);
+    return { response: `Suggested title: ${title}` };
+  }
+
+  if (normalized === "/tags") {
+    const tags = deriveTags(markdownContent);
+    return {
+      response: tags.length
+        ? `Suggested tags: ${tags.map((tag) => `#${tag}`).join(" ")}`
+        : fallbackText,
+    };
+  }
+
+  if (normalized === "/todo") {
+    const parsed = Number(args);
+    const count = Number.isFinite(parsed) && parsed > 0 ? Math.min(12, Math.floor(parsed)) : 5;
+    const todo = createTodo(markdownContent, count).join("\n");
+    return { response: todo, markdownToInsert: todo, markdownMode: "append" };
+  }
+
+  if (normalized === "/template") {
+    const variant = args.toLowerCase();
+    if (!variant) {
+      return { response: "Usage: /template [daily|meeting|journal]" };
+    }
+    const template = generateTemplate(variant);
+    if (template.startsWith("Unknown template")) {
+      return { response: template };
+    }
+    return {
+      response: `Template inserted: ${variant}`,
+      markdownToInsert: template,
+      markdownMode: "replace",
+    };
+  }
+
+  if (normalized === "/continue") {
+    const paragraph = continueParagraph(markdownContent);
+    return { response: paragraph, markdownToInsert: paragraph, markdownMode: "append" };
+  }
+
+  if (normalized === "/shorten") {
+    const shortened = shortenContent(markdownContent);
+    return {
+      response: "Created a shorter version of your note.",
+      markdownToInsert: shortened,
+      markdownMode: "replace",
+    };
+  }
+
+  if (normalized === "/replace") {
+    const parsed = parseReplace(args);
+    if (!parsed) {
+      return { response: "Usage: /replace <find> => <replace>" };
+    }
+    const nextValue = markdownContent.split(parsed.findValue).join(parsed.replaceValue);
+    if (nextValue === markdownContent) {
+      return { response: `No matches found for "${parsed.findValue}".` };
+    }
+    return {
+      response: `Replaced "${parsed.findValue}" with "${parsed.replaceValue}".`,
+      markdownToInsert: nextValue,
+      markdownMode: "replace",
+    };
+  }
+
+  return { response: `Unknown command: ${input}. Type /help.` };
+};
+
 export default function Chatbot() {
   const { markdownContent, setMarkdownContent } = useNoteStore();
-  const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
-  const [userInput, setUserInput] = useState<string>("");
-  const [isFirstTime, setIsFirstTime] = useState<boolean>(true);
-  const [isTyping, setIsTyping] = useState<boolean>(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
+  const [userInput, setUserInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Show introductory message if it's the first time the user opens the chatbot
   useEffect(() => {
-    if (isFirstTime) {
-      setMessages([
-        {
-          sender: "chatbot",
-          text: "Hello! I'm your chatbot. I can generate markdown for you!",
-        },
-        {
-          sender: "chatbot",
-          text: "Here are some commands you can try:\n- `/header`: Generate a header\n- `/help`: List all commands\n- `/bold`: Add bold text\n- `/italic`: Add italic text",
-        },
-      ]);
-      setIsFirstTime(false);
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
     }
-  }, [isFirstTime]);
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+  }, [messages, isTyping]);
+
+  const handleSendMessage = (nextInput?: string) => {
+    const trimmed = (nextInput ?? userInput).trim();
+    if (!trimmed || isTyping) {
+      return;
     }
-  }, [messages]);
 
-  console.log(messagesEndRef);
-
-  // Function to simulate typing effect
-  const simulateTyping = (text: string, callback: () => void) => {
-    console.log(text);
-    let index = 0;
-    console.log(text[index]);
-    const interval = setInterval(() => {
-      setMarkdownContent(markdownContent.concat(text[index]));
-      console.log(markdownContent);
-      index++;
-      if (index === text.length) {
-        clearInterval(interval);
-        callback();
-      }
-    }, 100); // Adjust typing speed (100ms per character)
-  };
-
-  const handleSendMessage = () => {
-    if (userInput.trim() === "") return;
-    let newMessages = [...messages];
-
-    newMessages.push({
-      sender: "user",
-      text: userInput,
-    });
-
-    setIsTyping(true);
-    setMessages([...newMessages, { sender: "chatbot", text: "..." }]);
-
-    setTimeout(() => {
-      let markdownResponse = "";
-      let shouldInsertToMarkdown = false;
-      if (userInput.startsWith("/")) {
-        const command = userInput.toLowerCase().trim();
-
-        switch (command) {
-          case "/header1":
-            markdownResponse = `# Heading1`;
-            shouldInsertToMarkdown = true;
-            break;
-          case "/header2":
-            markdownResponse = `# Heading2`;
-            shouldInsertToMarkdown = true;
-            break;
-          case "/header3":
-            markdownResponse = `# Heading3`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/bold":
-            markdownResponse = `**This is bold text**\nUse \`**text**\` to make text bold.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/italic":
-            markdownResponse = `*This is italic text*\nUse \`*text*\` to italicize.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/blockquote":
-            markdownResponse = `> This is a blockquote.\nUse \`>\` to create a blockquote.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/list":
-            markdownResponse = `- Item 1\n- Item 2\n- Item 3\nUse \`-\` for bullet lists.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/orderedlist":
-            markdownResponse = `1. First item\n2. Second item\n3. Third item\nUse numbers for ordered lists.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/code":
-            markdownResponse = `\`\`\`js\nconsole.log("Hello, world!");\n\`\`\`\nUse triple backticks for code blocks.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/inlinecode":
-            markdownResponse = `Use \`const name = "Chatbot"\` for inline code.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/link":
-            markdownResponse = `[OpenAI](https://www.openai.com)\nUse \`[text](url)\` to create a link.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/image":
-            markdownResponse = `![Alt text](https://via.placeholder.com/150)\nUse \`![alt](url)\` for images.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/horizontal":
-            markdownResponse = `---\nUse \`---\` for a horizontal rule.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/table":
-            markdownResponse = `| Syntax | Description |\n| ----------- | ----------- |\n| Header | Title |\n| Paragraph | Text |\nUse pipes and hyphens to create tables.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/task":
-            markdownResponse = `- [x] Completed task\n- [ ] Incomplete task\nUse \`- [ ]\` for task lists.`;
-            shouldInsertToMarkdown = true;
-            break;
-
-          case "/help":
-            markdownResponse = [
-              "**Available Markdown Commands:**",
-              "- `/header1` – Add H1 headers",
-              "- `/header2` – Add H2 headers",
-              "- `/header3` – Add H3 headers",
-              "- `/bold` – Bold text",
-              "- `/italic` – Italic text",
-              "- `/blockquote` – Add a quote block",
-              "- `/list` – Bullet list",
-              "- `/orderedlist` – Numbered list",
-              "- `/code` – Code block",
-              "- `/inlinecode` – Inline code",
-              "- `/link` – Add hyperlink",
-              "- `/image` – Embed image",
-              "- `/horizontal` – Horizontal line",
-              "- `/table` – Markdown table",
-              "- `/task` – Task checklist",
-              "- `/help` – Show this help",
-            ].join("\n");
-            break;
-
-          default:
-            markdownResponse = `❌ Command not recognized: \`${command}\`. Type \`/help\` for a list of available commands.`;
-            break;
-        }
-      } else {
-        markdownResponse = `Sorry, I don't recognize the command "${userInput}". Try typing /help for a list of commands.`;
-      }
-
-      // const updatedMessages = [...newMessages, { sender: "chatbot", text: markdownResponse }];
-      // setMessages(updatedMessages);
-
-      newMessages.push({
-        sender: "chatbot",
-        text: markdownResponse,
-      });
-
-      setMessages(newMessages);
+    if (trimmed.toLowerCase() === "/clear") {
+      setMessages([introMessage]);
       setUserInput("");
-      setIsTyping(false);
-      if (shouldInsertToMarkdown) {
-        setMarkdownContent(markdownContent.concat(markdownResponse));
+      return;
+    }
+
+    setMessages((previous) => [...previous, { sender: "user", text: trimmed }]);
+    setUserInput("");
+    setIsTyping(true);
+
+    window.setTimeout(() => {
+      const result = executeCommand(trimmed, markdownContent);
+      setMessages((previous) => [...previous, { sender: "chatbot", text: result.response }]);
+
+      if (result.markdownToInsert) {
+        if (result.markdownMode === "replace") {
+          setMarkdownContent(result.markdownToInsert);
+        } else {
+          setMarkdownContent((currentValue) => `${currentValue}\n\n${result.markdownToInsert}`);
+        }
       }
-    }, 1500);
+
+      setIsTyping(false);
+    }, 350);
   };
 
   return (
@@ -203,30 +322,39 @@ export default function Chatbot() {
             size="icon"
             className="rounded-full bg-primary text-primary-foreground"
           >
-            <Bot className="w-8 h-8" />
+            <Bot className="h-8 w-8" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="sm:max-w-[500px] w-full h-[600px] flex flex-col" align="end">
+        <PopoverContent className="flex h-[600px] w-full flex-col sm:max-w-[500px]" align="end">
           <div className="border-b">
-            <div className=" flex gap-2 text-lg font-medium text-center p-2">
-              <Avatar className="w-8 h-8 border">
+            <div className="flex items-center gap-2 p-2 text-center text-lg font-medium">
+              <Avatar className="h-8 w-8 border">
                 <AvatarImage src="/placeholder-user.jpg" alt="Chatbot" />
                 <AvatarFallback>
                   <Bot />
                 </AvatarFallback>
               </Avatar>
-              Happy bot
+              Happy Bot
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto"
+                onClick={() => setMessages([introMessage])}
+                aria-label="Clear chat"
+              >
+                <Eraser className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-4" ref={messagesEndRef}>
+          <div className="flex-1 overflow-auto p-4" ref={messagesContainerRef}>
             <div className="grid gap-4">
               {messages.map((message, index) => (
                 <div
-                  key={index}
+                  key={`${message.sender}-${index}-${message.text}`}
                   className={`flex items-start gap-3 ${message.sender === "user" ? "justify-end" : ""}`}
                 >
                   {message.sender === "chatbot" && (
-                    <Avatar className="w-8 h-8 border">
+                    <Avatar className="h-8 w-8 border">
                       <AvatarImage src="/placeholder-user.jpg" alt="Chatbot" />
                       <AvatarFallback>
                         <Bot />
@@ -238,12 +366,12 @@ export default function Chatbot() {
                       message.sender === "chatbot"
                         ? "bg-muted"
                         : "bg-primary text-primary-foreground"
-                    } rounded-lg p-3 max-w-[80%]`}
+                    } max-w-[80%] rounded-lg p-3 whitespace-pre-wrap`}
                   >
-                    {message.text === "..." ? <TypingIndicator /> : <p>{message.text}</p>}
+                    <p>{message.text}</p>
                   </div>
                   {message.sender === "user" && (
-                    <Avatar className="w-8 h-8 border">
+                    <Avatar className="h-8 w-8 border">
                       <AvatarImage src="/placeholder-user.jpg" alt="User" />
                       <AvatarFallback>
                         <User />
@@ -252,28 +380,46 @@ export default function Chatbot() {
                   )}
                 </div>
               ))}
+              {isTyping && <TypingIndicator />}
             </div>
-            <div ref={messagesEndRef} />
           </div>
-          <div className="border-t p-2">
+          <div className="space-y-2 border-t p-2">
+            <div className="flex flex-wrap gap-2">
+              {quickCommands.map((command) => (
+                <Button
+                  key={command}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSendMessage(command)}
+                >
+                  {command}
+                </Button>
+              ))}
+            </div>
             <div className="relative">
               <Textarea
-                placeholder="Type your message..."
+                placeholder="Type /help..."
                 name="message"
                 id="message"
                 rows={1}
                 value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                className="min-h-[48px] rounded-2xl resize-none p-4 border border-neutral-400 shadow-sm pr-16"
+                onChange={(event) => setUserInput(event.target.value)}
+                className="min-h-[48px] resize-none rounded-2xl border border-neutral-400 p-4 pr-16 shadow-sm"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
               />
               <Button
                 type="button"
                 size="icon"
-                className="absolute w-8 h-8 top-3 right-3"
-                onClick={handleSendMessage}
+                className="absolute top-3 right-3 h-8 w-8"
+                onClick={() => handleSendMessage()}
                 disabled={isTyping}
               >
-                <Send className="w-4 h-4" />
+                <Send className="h-4 w-4" />
                 <span className="sr-only">Send</span>
               </Button>
             </div>

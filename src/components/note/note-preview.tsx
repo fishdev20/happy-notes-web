@@ -2,7 +2,6 @@ import { getLanguageExtension } from "@/lib/utils";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import Markdown from "react-markdown";
-import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
@@ -11,9 +10,8 @@ const NotePreview = ({ markdownContent }: { markdownContent: string }) => {
     <div className="prose prose-md h-full w-full p-2 dark:prose-invert">
       <Markdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={[rehypeRaw]}
         components={{
-          a: ({ node, ...props }) => {
+          a: ({ ...props }) => {
             return (
               <a
                 {...props}
@@ -24,7 +22,7 @@ const NotePreview = ({ markdownContent }: { markdownContent: string }) => {
               />
             );
           },
-          pre: ({ node, ...props }) => (
+          pre: ({ ...props }) => (
             <pre {...props} className="!m-0 !p-0 !bg-transparent !shadow-none" />
           ),
           code: ({ className, children, ...rest }) => {
