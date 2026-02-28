@@ -2,6 +2,7 @@
 
 import Note, { NoteLayout } from "@/@types/models/Note";
 import Chatbot from "@/components/note/chat-bot";
+import ExportNoteMenu from "@/components/note/export-note-menu";
 import InsertToolbar from "@/components/note/insert-toolbar";
 import NoteDiff from "@/components/note/note-diff";
 import NoteEditor from "@/components/note/note-editor";
@@ -116,6 +117,7 @@ export default function AddNote() {
             {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
             {isSaving ? "Saving..." : "Save"}
           </Button>
+          <ExportNoteMenu title={title} markdown={markdownContent} />
           <TooltipProvider>
             <ToggleGroup
               type="single"
