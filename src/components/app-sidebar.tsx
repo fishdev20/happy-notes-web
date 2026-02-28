@@ -108,7 +108,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           <DropdownMenuTrigger>
                             <SidebarMenuItem>
                               <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                                <Link href={`${item.url}`}>
+                                <Link href={`${item.url}`} prefetch>
                                   <item.icon />
                                   <span>{item.title}</span>
                                 </Link>
@@ -123,7 +123,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                   key={sub.url}
                                   className={pathname === sub.url ? "bg-muted text-primary" : ""}
                                 >
-                                  <Link href={`${sub.url}`}>
+                                  <Link href={`${sub.url}`} prefetch>
                                     <span>{sub.title}</span>
                                   </Link>
                                 </DropdownMenuItem>
@@ -154,7 +154,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                   return (
                                     <SidebarMenuSubItem key={submenu.url}>
                                       <SidebarMenuSubButton asChild isActive={isSubmenuSelected}>
-                                        <Link href={submenu.url} className="w-full">
+                                        <Link href={submenu.url} className="w-full" prefetch>
                                           <span>
                                             <Dot size={18} />
                                           </span>
@@ -175,7 +175,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                        <Link href={`${item.url}`}>
+                        <Link href={`${item.url}`} prefetch>
                           <item.icon />
                           <span>{item.title}</span>
                         </Link>

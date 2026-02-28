@@ -33,7 +33,7 @@ export function NavigationMenuDemo() {
 
   return (
     <div className="flex w-full items-center gap-4">
-      <Link href="/" className="flex items-center gap-2 font-semibold">
+      <Link href="/" className="flex items-center gap-2 font-semibold" prefetch>
         <NotebookPen className="h-5 w-5" />
         <span>Happy Notes</span>
       </Link>
@@ -44,6 +44,7 @@ export function NavigationMenuDemo() {
           return (
             <Link
               href={link.href}
+              prefetch
               key={link.href}
               className={`rounded-md px-3 py-2 text-sm transition-colors ${
                 isActive

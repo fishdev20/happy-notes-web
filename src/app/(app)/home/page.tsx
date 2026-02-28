@@ -53,6 +53,7 @@ export default function HomePage() {
           <Link
             key={item.title}
             href={item.href}
+            prefetch
             className="animate-fade-up rounded-2xl border bg-card/80 p-5 shadow-sm backdrop-blur-sm transition hover:border-primary/50 hover:shadow-md"
             style={{ animationDelay: `${80 + index * 60}ms` }}
           >

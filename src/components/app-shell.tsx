@@ -1,4 +1,5 @@
 import AppBreadCrumb from "@/components/app-breadcrumb";
+import RoutePrefetcher from "@/components/route-prefetcher";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NavigationMenuDemo } from "@/components/nav-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +10,7 @@ import { Suspense } from "react";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative z-10 h-svh overflow-hidden">
+      <RoutePrefetcher />
       <header className="flex h-[4rem] shrink-0 items-center gap-2 border-b border-border/70 bg-background/60 px-4 backdrop-blur">
         <NavigationMenuDemo />
       </header>

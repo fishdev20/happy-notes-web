@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import React from "react";
 import {
   Breadcrumb,
@@ -47,13 +48,17 @@ export default function AppBreadCrumb() {
           return (
             <React.Fragment key={crumb.href}>
               <BreadcrumbItem>
-                <BreadcrumbLink
-                  href={isLast ? undefined : crumb.href}
-                  aria-current={isLast ? "page" : undefined}
-                  className="capitalize"
-                >
-                  {crumb.name}
-                </BreadcrumbLink>
+                {isLast ? (
+                  <BreadcrumbLink aria-current="page" className="capitalize">
+                    {crumb.name}
+                  </BreadcrumbLink>
+                ) : (
+                  <BreadcrumbLink asChild className="capitalize">
+                    <Link href={crumb.href} prefetch>
+                      {crumb.name}
+                    </Link>
+                  </BreadcrumbLink>
+                )}
               </BreadcrumbItem>
               {!isLast && <BreadcrumbSeparator />}
             </React.Fragment>
