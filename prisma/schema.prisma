@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum NoteStatus {
+  ACTIVE
+  ARCHIVED
+  TRASH
+}
+
+enum NoteMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum SharePermission {
+  VIEW
+  COMMENT
+  EDIT
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+enum SavedViewSortBy {
+  UPDATED_AT
+  CREATED_AT
+}
+
+model UserProfile {
+  id          String   @id @db.Uuid
+  email       String?  @unique
+  displayName String?  @db.VarChar(120)
+  avatarUrl   String?
+  timezone    String?  @default("UTC") @db.VarChar(64)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownedNotes     Note[]        @relation("OwnedNotes")
+  noteMembership NoteMember[]
+  savedViews     SavedView[]
+  tags           Tag[]
+  noteVersions   NoteVersion[]
+  createdShares  ShareLink[]   @relation("ShareCreator")
+
+  @@map("user_profiles")
+}
+
+model Note {
+  id           String     @id @default(uuid()) @db.Uuid
+  ownerId      String     @db.Uuid
+  title        String     @default("Untitled note") @db.VarChar(255)
+  body         String     @default("")
+  status       NoteStatus @default(ACTIVE)
+  color        String?    @db.VarChar(32)
+  isPinned     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lastEditedAt DateTime   @default(now())
+  archivedAt   DateTime?
+  deletedAt    DateTime?
+
+  owner      UserProfile   @relation("OwnedNotes", fields: [ownerId], references: [id], onDelete: Cascade)
+  tags       NoteTag[]
+  members    NoteMember[]
+  versions   NoteVersion[]
+  shareLinks ShareLink[]
+
+  @@index([ownerId, status, updatedAt, id], map: "notes_owner_status_updated_id_idx")
+  @@index([ownerId, status, createdAt, id], map: "notes_owner_status_created_id_idx")
+  @@map("notes")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @db.Uuid
+  name      String   @db.VarChar(64)
+  slug      String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner UserProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  notes NoteTag[]
+
+  @@unique([ownerId, slug], map: "tags_owner_slug_unique")
+  @@index([ownerId, name], map: "tags_owner_name_idx")
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId    String   @db.Uuid
+  tagId     String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId, noteId], map: "note_tags_tag_note_idx")
+  @@map("note_tags")
+}
+
+model SavedView {
+  id                String          @id @default(uuid()) @db.Uuid
+  ownerId           String          @db.Uuid
+  name              String          @db.VarChar(120)
+  searchQuery       String          @default("")
+  tagSlugs          String[]        @default([])
+  statuses          NoteStatus[]    @default([ACTIVE])
+  sortBy            SavedViewSortBy @default(UPDATED_AT)
+  sortOrder         SortOrder       @default(DESC)
+  updatedWithinDays Int?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  owner UserProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, name], map: "saved_views_owner_name_unique")
+  @@index([ownerId, updatedAt], map: "saved_views_owner_updated_idx")
+  @@map("saved_views")
+}
+
+model NoteMember {
+  noteId    String         @db.Uuid
+  userId    String         @db.Uuid
+  role      NoteMemberRole @default(EDITOR)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  note Note        @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, userId])
+  @@index([userId, role], map: "note_members_user_role_idx")
+  @@map("note_members")
+}
+
+model ShareLink {
+  id           String          @id @default(uuid()) @db.Uuid
+  noteId       String          @db.Uuid
+  token        String          @unique @db.VarChar(64)
+  permission   SharePermission @default(VIEW)
+  createdById  String          @db.Uuid
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  lastAccessAt DateTime?
+  createdAt    DateTime        @default(now())
+
+  note      Note        @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  createdBy UserProfile @relation("ShareCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt], map: "share_links_note_created_idx")
+  @@index([token, revokedAt], map: "share_links_token_revoked_idx")
+  @@map("share_links")
+}
+
+model NoteVersion {
+  id        BigInt   @id @default(autoincrement())
+  noteId    String   @db.Uuid
+  authorId  String?  @db.Uuid
+  title     String   @db.VarChar(255)
+  body      String
+  createdAt DateTime @default(now())
+
+  note   Note         @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author UserProfile? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([noteId, createdAt], map: "note_versions_note_created_idx")
+  @@map("note_versions")
+}

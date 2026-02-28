@@ -1,3 +1,5 @@
+"use client";
+
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +12,106 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NotebookPen } from "lucide-react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import useToastStore from "@/store/use-toast-store";
+import { Chrome, Github, Loader2, NotebookPen } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useMemo, useState } from "react";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const pushToast = useToastStore((state) => state.pushToast);
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<"google" | "github" | null>(null);
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (password !== confirmPassword) {
+      pushToast({
+        title: "Password mismatch",
+        description: "Confirm password must match your password.",
+        variant: "error",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    callbackUrl.searchParams.set("next", "/home");
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        emailRedirectTo: callbackUrl.toString(),
+        data: {
+          name,
+          full_name: name,
+        },
+      },
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      pushToast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "error",
+      });
+      return;
+    }
+
+    if (data.session) {
+      pushToast({
+        title: "Account created",
+        description: "Welcome to Happy Notes.",
+        variant: "success",
+      });
+      router.replace("/home");
+      router.refresh();
+      return;
+    }
+
+    pushToast({
+      title: "Check your inbox",
+      description: "We sent a confirmation link to finish your registration.",
+      variant: "info",
+    });
+  }
+
+  async function handleOAuthSignup(provider: "google" | "github") {
+    setOauthProvider(provider);
+
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    callbackUrl.searchParams.set("next", "/home");
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: callbackUrl.toString(),
+      },
+    });
+
+    if (error) {
+      setOauthProvider(null);
+      pushToast({
+        title: "OAuth signup failed",
+        description: error.message,
+        variant: "error",
+      });
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-background px-4 py-8 text-foreground">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -52,37 +150,103 @@ export default function RegisterPage() {
             <CardDescription>Create your Happy Notes account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" type="text" placeholder="Your name" autoComplete="name" />
+            <form className="space-y-4" onSubmit={handleRegister}>
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Create password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSubmitting || oauthProvider !== null}
+              >
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
+              </Button>
+            </form>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" autoComplete="email" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Create password"
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Confirm password"
-                autoComplete="new-password"
-              />
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOAuthSignup("google")}
+                disabled={isSubmitting || oauthProvider !== null}
+              >
+                {oauthProvider === "google" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Chrome className="h-4 w-4" />
+                )}
+                Google
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOAuthSignup("github")}
+                disabled={isSubmitting || oauthProvider !== null}
+              >
+                {oauthProvider === "github" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Github className="h-4 w-4" />
+                )}
+                GitHub
+              </Button>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-3">
-            <Button type="button" className="w-full">
-              Create account
-            </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link href="/login" className="font-medium text-primary hover:underline">

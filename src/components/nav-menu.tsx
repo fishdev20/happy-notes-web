@@ -4,6 +4,7 @@ import { NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ModeToggle } from "./mode-toggle";
+import UserMenu from "./user-menu";
 
 const links = [
   {
@@ -60,6 +61,7 @@ export function NavigationMenuDemo() {
 
       <div className="flex items-center gap-2 ml-auto">
         <ModeToggle />
+        <UserMenu />
       </div>
     </div>
   );

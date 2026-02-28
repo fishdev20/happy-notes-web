@@ -1,7 +1,9 @@
 import { ModeToggle } from "@/components/mode-toggle";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NotebookPen } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 const brands = ["ZenFlow", "Luma", "Northstar", "Afterglow", "Bluebird", "Atlas"];
 
@@ -37,7 +39,16 @@ function TryNowButton() {
   );
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/home");
+  }
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none absolute inset-0 -z-10">

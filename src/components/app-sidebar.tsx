@@ -2,6 +2,7 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -20,13 +21,16 @@ import {
   ChevronRight,
   Dot,
   Home,
+  LogOut,
   Settings,
   SquarePen,
   Trash,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import useToastStore from "@/store/use-toast-store";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import {
   DropdownMenu,
@@ -80,12 +84,34 @@ const items = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const pushToast = useToastStore((state) => state.pushToast);
   const { open } = useSidebar();
   const [isNotesOpen, setIsNotesOpen] = React.useState(pathname.startsWith("/notes"));
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   React.useEffect(() => {
     setIsNotesOpen(pathname.startsWith("/notes"));
   }, [pathname]);
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    setIsSigningOut(false);
+
+    if (error) {
+      pushToast({
+        title: "Sign out failed",
+        description: error.message,
+        variant: "error",
+      });
+      return;
+    }
+
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <Sidebar className="top-[4rem]" variant="inset" {...props} collapsible="icon">
@@ -188,6 +214,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              tooltip="Sign out"
+              disabled={isSigningOut}
+              className="cursor-pointer"
+            >
+              <LogOut />
+              <span>{isSigningOut ? "Signing out..." : "Sign out"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
