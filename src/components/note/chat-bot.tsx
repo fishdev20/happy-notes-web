@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import useAiSettingsStore from "@/store/use-ai-settings-store";
 import useNoteStore from "@/store/use-note-store";
 import { Bot, Eraser, Send, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -20,15 +21,23 @@ type CommandResult = {
   markdownMode?: "append" | "replace";
 };
 
-const quickCommands = ["/help", "/summarize", "/title", "/todo 5", "/template daily", "/tags"];
+const quickCommands = [
+  "/help",
+  "/template sprint planning",
+  "/template weekly review",
+  "/template 1:1 meeting notes",
+];
 
 const commandDocs = [
   { command: "/help", description: "Show available commands." },
-  { command: "/summarize", description: "Summarize current note into bullet points." },
-  { command: "/title", description: "Suggest a title from note content." },
-  { command: "/tags", description: "Suggest 3-5 lightweight tags." },
-  { command: "/todo [count]", description: "Create checklist from note, default 5 items." },
-  { command: "/template [daily|meeting|journal]", description: "Insert structured template." },
+  {
+    command: "/template <description>",
+    description: "Generate a markdown template with real AI and insert it.",
+  },
+  {
+    command: "<description>",
+    description: "Send plain text to generate a template directly (no slash needed).",
+  },
   { command: "/continue", description: "Generate a continuation paragraph for current note." },
   { command: "/shorten", description: "Rewrite note to a shorter version." },
   { command: "/replace <find> => <replace>", description: "Replace text in note content." },
@@ -37,7 +46,7 @@ const commandDocs = [
 
 const introMessage: ChatMessage = {
   sender: "chatbot",
-  text: "I can help shape your note. Try /help or tap a quick command below.",
+  text: "I generate markdown note templates with AI. Describe what you need or use /template ...",
 };
 
 const fallbackText = "No note content yet. Start writing and I can help transform it.";
@@ -124,19 +133,6 @@ const summarize = (content: string) => {
   return ["Summary:", ...keyPoints].join("\n");
 };
 
-const generateTemplate = (variant: string) => {
-  switch (variant) {
-    case "daily":
-      return `# Daily Note\n\n## Focus\n- \n\n## Wins\n- \n\n## Challenges\n- \n\n## Next Step\n- `;
-    case "meeting":
-      return `# Meeting Notes\n\n## Agenda\n- \n\n## Decisions\n- \n\n## Action Items\n- [ ] `;
-    case "journal":
-      return `# Journal Entry\n\n## How I feel\n\n## What happened\n\n## What I learned\n\n## Tomorrow's intention`;
-    default:
-      return `Unknown template "${variant}". Use: daily, meeting, journal.`;
-  }
-};
-
 const createTodo = (content: string, count: number) => {
   const lines = toLines(content);
   if (!lines.length) {
@@ -174,7 +170,77 @@ const parseReplace = (args: string) => {
   return { findValue: parts[0], replaceValue: parts[1] };
 };
 
-const executeCommand = (input: string, markdownContent: string): CommandResult => {
+const generateTemplateWithAI = async (
+  description: string,
+  markdownContent: string,
+  aiSettings: {
+    provider: "auto" | "ollama" | "openai";
+    ollamaBaseUrl: string;
+    ollamaModel: string;
+    openAiApiKey: string;
+  },
+): Promise<CommandResult> => {
+  const context = markdownContent.trim();
+  const trimmedContext = context.slice(0, 900);
+  const enrichedRequest = context
+    ? `${description}\n\nCurrent note context:\n${trimmedContext}`
+    : description;
+
+  const response = await fetch("/api/ai/template", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userRequest: enrichedRequest,
+      provider: aiSettings.provider,
+      ollamaBaseUrl: aiSettings.ollamaBaseUrl,
+      ollamaModel: aiSettings.ollamaModel,
+      openAiApiKey: aiSettings.openAiApiKey,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      details?: string;
+      hint?: string;
+    };
+    return {
+      response: payload.error
+        ? [
+            `AI error: ${payload.error}`,
+            payload.details ? `Details: ${payload.details}` : "",
+            payload.hint ? `Hint: ${payload.hint}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : "AI request failed. Check your provider settings in /settings.",
+    };
+  }
+
+  const payload = (await response.json()) as { markdown?: string; model?: string };
+  if (!payload.markdown) {
+    return { response: "AI returned an empty response." };
+  }
+
+  return {
+    response: payload.markdown,
+    markdownToInsert: payload.markdown,
+    markdownMode: "replace",
+  };
+};
+
+const executeCommand = async (
+  input: string,
+  markdownContent: string,
+  aiSettings: {
+    provider: "auto" | "ollama" | "openai";
+    ollamaBaseUrl: string;
+    ollamaModel: string;
+    openAiApiKey: string;
+  },
+): Promise<CommandResult> => {
   const [command, ...restArgs] = input.trim().split(/\s+/);
   const args = restArgs.join(" ").trim();
   const normalized = command.toLowerCase();
@@ -219,19 +285,10 @@ const executeCommand = (input: string, markdownContent: string): CommandResult =
   }
 
   if (normalized === "/template") {
-    const variant = args.toLowerCase();
-    if (!variant) {
-      return { response: "Usage: /template [daily|meeting|journal]" };
+    if (!args) {
+      return { response: "Usage: /template <description>" };
     }
-    const template = generateTemplate(variant);
-    if (template.startsWith("Unknown template")) {
-      return { response: template };
-    }
-    return {
-      response: `Template inserted: ${variant}`,
-      markdownToInsert: template,
-      markdownMode: "replace",
-    };
+    return await generateTemplateWithAI(args, markdownContent, aiSettings);
   }
 
   if (normalized === "/continue") {
@@ -264,11 +321,19 @@ const executeCommand = (input: string, markdownContent: string): CommandResult =
     };
   }
 
-  return { response: `Unknown command: ${input}. Type /help.` };
+  if (normalized.startsWith("/")) {
+    return { response: `Unknown command: ${input}. Type /help.` };
+  }
+
+  return await generateTemplateWithAI(input, markdownContent, aiSettings);
 };
 
 export default function Chatbot() {
   const { markdownContent, setMarkdownContent } = useNoteStore();
+  const provider = useAiSettingsStore((state) => state.provider);
+  const ollamaBaseUrl = useAiSettingsStore((state) => state.ollamaBaseUrl);
+  const ollamaModel = useAiSettingsStore((state) => state.ollamaModel);
+  const getOpenAiApiKey = useAiSettingsStore((state) => state.getOpenAiApiKey);
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
   const [userInput, setUserInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -297,8 +362,13 @@ export default function Chatbot() {
     setUserInput("");
     setIsTyping(true);
 
-    window.setTimeout(() => {
-      const result = executeCommand(trimmed, markdownContent);
+    window.setTimeout(async () => {
+      const result = await executeCommand(trimmed, markdownContent, {
+        provider,
+        ollamaBaseUrl,
+        ollamaModel,
+        openAiApiKey: getOpenAiApiKey(),
+      });
       setMessages((previous) => [...previous, { sender: "chatbot", text: result.response }]);
 
       if (result.markdownToInsert) {
@@ -398,7 +468,7 @@ export default function Chatbot() {
             </div>
             <div className="relative">
               <Textarea
-                placeholder="Type /help..."
+                placeholder="Describe the template you want..."
                 name="message"
                 id="message"
                 rows={1}

@@ -14,7 +14,16 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Archive, Calendar, ChevronRight, Dot, Home, SquarePen, Trash } from "lucide-react";
+import {
+  Archive,
+  Calendar,
+  ChevronRight,
+  Dot,
+  Home,
+  Settings,
+  SquarePen,
+  Trash,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -61,6 +70,11 @@ const items = [
     title: "Trash",
     url: "/trash",
     icon: Trash,
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
   },
 ];
 

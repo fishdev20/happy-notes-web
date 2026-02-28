@@ -1,20 +1,19 @@
 "use client";
 
-import { NoteLayout } from "@/@types/models/Note";
+import Note, { NoteLayout } from "@/@types/models/Note";
 import Chatbot from "@/components/note/chat-bot";
 import InsertToolbar from "@/components/note/insert-toolbar";
 import NoteDiff from "@/components/note/note-diff";
 import NoteEditor from "@/components/note/note-editor";
 import NotePreview from "@/components/note/note-preview";
-import Note from "@/@types/models/Note";
-import { parseTagInput } from "@/lib/note-query";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { parseTagInput } from "@/lib/note-query";
 import useLayoutStore from "@/store/use-layout-store";
 import useNoteStore from "@/store/use-note-store";
+import { useQueryClient } from "@tanstack/react-query";
 import { Code, Columns2, Eye, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -99,7 +98,7 @@ export default function AddNote() {
 
   return (
     <div className="flex flex-col gap-4 h-full min-h-[calc(100svh-4rem-4rem)] relative">
-      <div className="sticky top-0 z-10 overflow-x-auto rounded-md border bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-10 overflow-x-auto border bg-background/70 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex min-w-max items-center gap-2">
           <Input
             value={title}

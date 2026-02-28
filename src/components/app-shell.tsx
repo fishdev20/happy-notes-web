@@ -8,7 +8,7 @@ import { Suspense } from "react";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative z-10">
+    <div className="relative z-10 h-svh overflow-hidden">
       <header className="flex h-[4rem] shrink-0 items-center gap-2 border-b border-border/70 bg-background/60 px-4 backdrop-blur">
         <NavigationMenuDemo />
       </header>

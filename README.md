@@ -8,7 +8,7 @@ Happy Notes is a markdown-first journaling app built with Next.js and Zustand.
 - Local persistent storage for notes
 - Note lifecycle management: active, archived, trash
 - Calendar view by note update date
-- In-editor markdown helper chatbot commands
+- In-editor AI template generator (real OpenAI API call)
 - Light and dark themes
 
 ## Tech Stack
@@ -28,6 +28,34 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+For AI template generation, you have two options:
+
+### Free (recommended): local Ollama
+
+```bash
+# install Ollama first, then pull a writing-friendly model
+ollama pull qwen2.5:7b-instruct
+```
+
+Optional env vars (defaults already work):
+
+```bash
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5:7b-instruct
+```
+
+### Hosted OpenAI (paid)
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+AI_PROVIDER=openai
+```
+
+### Auto mode (default)
+
+If `AI_PROVIDER` is not set, the app tries Ollama first (free local), then OpenAI if `OPENAI_API_KEY` exists.
 
 ## Quality Gates
 
