@@ -8,11 +8,9 @@ import {
   useRestoreNoteMutation,
 } from "@/hooks/use-notes-query";
 import { sortByUpdatedAt } from "@/lib/note-utils";
-import useNoteStore from "@/store/use-note-store";
 
 export default function Archive() {
-  const { hasHydrated } = useNoteStore();
-  const { data: notes = [] } = useNotesQuery();
+  const { data: notes = [], isLoading } = useNotesQuery();
   const restoreMutation = useRestoreNoteMutation();
   const trashMutation = useMoveToTrashMutation();
   const archivedNotes = sortByUpdatedAt(
@@ -28,7 +26,7 @@ export default function Archive() {
         </p>
       </div>
 
-      {!hasHydrated ? (
+      {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading archived notes...</p>
       ) : archivedNotes.length === 0 ? (
         <p className="text-sm text-muted-foreground">No archived notes yet.</p>

@@ -48,8 +48,8 @@ export default function EditNotePage() {
   const noteId = params.id;
   const [title, setTitle] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const { markdownContent, setMarkdownContent, hasHydrated } = useNoteStore();
-  const { data: notes = [] } = useNotesQuery();
+  const { markdownContent, setMarkdownContent } = useNoteStore();
+  const { data: notes = [], isLoading } = useNotesQuery();
   const updateMutation = useUpdateNoteMutation();
   const archiveMutation = useArchiveNoteMutation();
   const trashMutation = useMoveToTrashMutation();
@@ -66,10 +66,20 @@ export default function EditNotePage() {
       return;
     }
 
+    const nextTagInput = currentNote.tag.join(", ");
+    const shouldSync =
+      title !== currentNote.title ||
+      tagInput !== nextTagInput ||
+      markdownContent !== currentNote.content;
+
+    if (!shouldSync) {
+      return;
+    }
+
     setTitle(currentNote.title);
-    setTagInput(currentNote.tag.join(", "));
+    setTagInput(nextTagInput);
     setMarkdownContent(currentNote.content);
-  }, [currentNote, setMarkdownContent]);
+  }, [currentNote, markdownContent, setMarkdownContent, tagInput, title]);
 
   const handleLayoutChange = (layout: NoteLayout | string) => {
     if (
@@ -128,7 +138,7 @@ export default function EditNotePage() {
     });
   };
 
-  if (!hasHydrated) {
+  if (isLoading) {
     return <p className="p-4 text-sm text-muted-foreground">Loading note...</p>;
   }
 

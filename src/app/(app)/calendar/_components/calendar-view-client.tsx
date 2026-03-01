@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNotesQuery } from "@/hooks/use-notes-query";
-import useNoteStore from "@/store/use-note-store";
 import { Calendar as BigCalendar, View, Views, dateFnsLocalizer } from "react-big-calendar";
 import { format, getDay, parse, startOfWeek } from "date-fns";
 import { enUS } from "date-fns/locale";
@@ -49,11 +48,9 @@ const viewOptions: { label: string; value: View }[] = [
 
 export default function CalendarViewClient() {
   const router = useRouter();
-  const { hasHydrated } = useNoteStore();
-  const { data: notes = [] } = useNotesQuery();
+  const { data: notes = [], isLoading } = useNotesQuery();
   const [date, setDate] = useState(new Date());
   const [view, setView] = useState<View>(Views.MONTH);
-  const isLoading = !hasHydrated;
 
   const events = useMemo<NoteEvent[]>(
     () =>

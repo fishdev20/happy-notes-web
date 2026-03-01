@@ -18,7 +18,6 @@ import {
   NoteSortField,
   collectTags,
   filterNotes,
-  paginateNotes,
   sortNotes,
 } from "@/lib/note-query";
 import {
@@ -37,7 +36,7 @@ const updatedWithinDaysOptions = [
 ];
 
 export default function Notes() {
-  const { savedViews, hasHydrated, createSavedView, deleteSavedView } = useNoteStore();
+  const { savedViews, createSavedView, deleteSavedView } = useNoteStore();
   const { data: notes = [], isLoading } = useNotesQuery();
   const archiveMutation = useArchiveNoteMutation();
   const trashMutation = useMoveToTrashMutation();
@@ -48,9 +47,7 @@ export default function Notes() {
   const [sortDirection, setSortDirection] = useState<NoteSortDirection>("desc");
   const [updatedWithinDays, setUpdatedWithinDays] = useState<number | null>(null);
   const [pageSize, setPageSize] = useState(12);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [visibleNotes, setVisibleNotes] = useState<typeof notes>([]);
+  const [page, setPage] = useState(1);
   const [viewName, setViewName] = useState("");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
@@ -76,11 +73,15 @@ export default function Notes() {
   );
 
   useEffect(() => {
-    const firstPage = paginateNotes(filteredSortedNotes, pageSize, sortField, null);
-    setVisibleNotes(firstPage.items);
-    setCursor(firstPage.nextCursor);
-    setHasNextPage(firstPage.hasNextPage);
-  }, [filteredSortedNotes, pageSize, sortField]);
+    setPage(1);
+  }, [query, selectedTags, sortField, sortDirection, updatedWithinDays, pageSize, notes]);
+
+  const visibleNotes = useMemo(
+    () => filteredSortedNotes.slice(0, page * pageSize),
+    [filteredSortedNotes, page, pageSize],
+  );
+
+  const hasNextPage = visibleNotes.length < filteredSortedNotes.length;
 
   const toggleTag = (tag: string) => {
     setActiveViewId(null);
@@ -90,13 +91,7 @@ export default function Notes() {
   };
 
   const loadMore = () => {
-    const nextPage = paginateNotes(filteredSortedNotes, pageSize, sortField, cursor);
-    setVisibleNotes((previous) => {
-      const known = new Set(previous.map((note) => note.id));
-      return [...previous, ...nextPage.items.filter((note) => !known.has(note.id))];
-    });
-    setCursor(nextPage.nextCursor);
-    setHasNextPage(nextPage.hasNextPage);
+    setPage((current) => current + 1);
   };
 
   const saveCurrentView = () => {
@@ -135,7 +130,7 @@ export default function Notes() {
     setActiveViewId(view.id);
   };
 
-  const isNotesLoading = !hasHydrated || isLoading;
+  const isNotesLoading = isLoading;
 
   return (
     <section className="space-y-4 p-4">

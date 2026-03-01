@@ -1,6 +1,6 @@
 "use client";
 
-import Note, { NoteLayout } from "@/@types/models/Note";
+import { NoteLayout } from "@/@types/models/Note";
 import Chatbot from "@/components/note/chat-bot";
 import ExportNoteMenu from "@/components/note/export-note-menu";
 import InsertToolbar from "@/components/note/insert-toolbar";
@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { parseTagInput } from "@/lib/note-query";
 import useLayoutStore from "@/store/use-layout-store";
 import useNoteStore from "@/store/use-note-store";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCreateNoteMutation } from "@/hooks/use-notes-query";
 import { Code, Columns2, Eye, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -41,11 +41,11 @@ const DEFAULT_MARKDOWN = "## Write your note here...";
 
 export default function AddNote() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [title, setTitle] = useState("Untitled note");
   const [tagInput, setTagInput] = useState("");
-  const { markdownContent, setMarkdownContent, createNote } = useNoteStore();
-  const [isSaving, setIsSaving] = useState(false);
+  const { markdownContent, setMarkdownContent } = useNoteStore();
+  const createMutation = useCreateNoteMutation();
+  const isSaving = createMutation.isPending;
   const { activeNoteLayout, setActiveNoteLayout } = useLayoutStore();
 
   useEffect(() => {
@@ -72,19 +72,16 @@ export default function AddNote() {
       return;
     }
 
-    setIsSaving(true);
-    try {
-      const created = createNote({
+    createMutation
+      .mutateAsync({
         title,
         content: markdownContent,
         tag: parseTagInput(tagInput),
-      });
-      queryClient.setQueryData<Note[]>(["notes"], useNoteStore.getState().notes);
-      router.replace(`/notes/${created.id}`);
-    } catch (error) {
-      console.error(error);
-      setIsSaving(false);
-    }
+      })
+      .then((created) => {
+        router.replace(`/notes/${created.id}`);
+      })
+      .catch((error) => console.error(error));
   };
 
   const handleInsertSnippet = (snippet: string) => {

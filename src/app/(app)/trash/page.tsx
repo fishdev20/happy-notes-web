@@ -8,11 +8,9 @@ import {
   useRestoreNoteMutation,
 } from "@/hooks/use-notes-query";
 import { sortByUpdatedAt } from "@/lib/note-utils";
-import useNoteStore from "@/store/use-note-store";
 
 export default function Trash() {
-  const { hasHydrated } = useNoteStore();
-  const { data: notes = [] } = useNotesQuery();
+  const { data: notes = [], isLoading } = useNotesQuery();
   const restoreMutation = useRestoreNoteMutation();
   const deleteMutation = useDeleteNoteMutation();
   const trashedNotes = sortByUpdatedAt(notes.filter((note) => note.status === NoteStatus.TRASH));
@@ -24,7 +22,7 @@ export default function Trash() {
         <p className="text-sm text-muted-foreground">Restore notes or remove them permanently.</p>
       </div>
 
-      {!hasHydrated ? (
+      {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading trashed notes...</p>
       ) : trashedNotes.length === 0 ? (
         <p className="text-sm text-muted-foreground">Trash is empty.</p>
