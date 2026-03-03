@@ -117,26 +117,30 @@ export const useUpdateNoteMutation = () => {
     mutationFn: async ({
       noteId,
       updates,
+      showSuccessToast = true,
     }: {
       noteId: string;
       updates: Partial<Pick<Note, "title" | "content" | "tag" | "status" | "color">>;
+      showSuccessToast?: boolean;
     }) => {
       const payload = await apiRequest<NoteResponse>(`/api/notes/${noteId}`, {
         method: "PATCH",
         body: JSON.stringify(updates),
       });
 
-      return payload.note;
+      return { note: payload.note, showSuccessToast };
     },
-    onSuccess: (updatedNote) => {
+    onSuccess: ({ note: updatedNote, showSuccessToast }) => {
       queryClient.setQueryData<Note[]>(NOTES_QUERY_KEY, (current) =>
         (current ?? []).map((note) => (note.id === updatedNote.id ? updatedNote : note)),
       );
-      pushToast({
-        title: "Note saved",
-        description: updatedNote.title,
-        variant: "success",
-      });
+      if (showSuccessToast) {
+        pushToast({
+          title: "Note saved",
+          description: updatedNote.title,
+          variant: "success",
+        });
+      }
     },
     onError: (error) => {
       pushToast({

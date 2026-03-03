@@ -1,154 +1,44 @@
 "use client";
 
-import { NoteLayout } from "@/@types/models/Note";
-import Chatbot from "@/components/note/chat-bot";
-import ExportNoteMenu from "@/components/note/export-note-menu";
-import InsertToolbar from "@/components/note/insert-toolbar";
-import NoteDiff from "@/components/note/note-diff";
-import NoteEditor from "@/components/note/note-editor";
-import NotePreview from "@/components/note/note-preview";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { parseTagInput } from "@/lib/note-query";
-import useLayoutStore from "@/store/use-layout-store";
-import useNoteStore from "@/store/use-note-store";
 import { useCreateNoteMutation } from "@/hooks/use-notes-query";
-import { Code, Columns2, Eye, Loader2, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef } from "react";
 
-const toggleItems = [
-  {
-    value: NoteLayout.SOURCE,
-    icon: <Code />,
-    label: "Editor Mode",
-  },
-  {
-    value: NoteLayout.DIFF,
-    icon: <Columns2 />,
-    label: "Diff Mode",
-  },
-  {
-    value: NoteLayout.PREVIEW,
-    icon: <Eye />,
-    label: "Preview Mode",
-  },
-];
-
-const DEFAULT_MARKDOWN = "## Write your note here...";
-
-export default function AddNote() {
+export default function AddNotePage() {
   const router = useRouter();
-  const [title, setTitle] = useState("Untitled note");
-  const [tagInput, setTagInput] = useState("");
-  const { markdownContent, setMarkdownContent } = useNoteStore();
   const createMutation = useCreateNoteMutation();
-  const isSaving = createMutation.isPending;
-  const { activeNoteLayout, setActiveNoteLayout } = useLayoutStore();
+  const createdRef = useRef(false);
 
   useEffect(() => {
-    setMarkdownContent(DEFAULT_MARKDOWN);
-  }, [setMarkdownContent]);
-
-  const canSave = useMemo(
-    () => title.trim().length > 0 || markdownContent.trim().length > 0,
-    [markdownContent, title],
-  );
-
-  const handleLayoutChange = (layout: NoteLayout | string) => {
-    if (
-      layout === NoteLayout.SOURCE ||
-      layout === NoteLayout.DIFF ||
-      layout === NoteLayout.PREVIEW
-    ) {
-      setActiveNoteLayout(layout);
-    }
-  };
-
-  const handleSave = () => {
-    if (!canSave || isSaving) {
+    if (createdRef.current) {
       return;
     }
 
+    createdRef.current = true;
+
     createMutation
       .mutateAsync({
-        title,
-        content: markdownContent,
-        tag: parseTagInput(tagInput),
+        title: "Untitled note",
+        content: "",
+        tag: [],
       })
       .then((created) => {
         router.replace(`/notes/${created.id}`);
       })
-      .catch((error) => console.error(error));
-  };
-
-  const handleInsertSnippet = (snippet: string) => {
-    setMarkdownContent((currentValue) => {
-      const normalized = currentValue.trim();
-      if (!normalized) {
-        return snippet;
-      }
-      return `${normalized}\n\n${snippet}`;
-    });
-  };
+      .catch((error) => {
+        createdRef.current = false;
+        console.error(error);
+        router.replace("/notes");
+      });
+  }, [createMutation, router]);
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-[calc(100svh-4rem-4rem)] relative">
-      <div className="sticky top-0 z-10 overflow-x-auto border bg-background/70 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex min-w-max items-center gap-2">
-          <Input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Note title"
-            className="w-56"
-          />
-          <Input
-            value={tagInput}
-            onChange={(event) => setTagInput(event.target.value)}
-            placeholder="Tags: meeting, work"
-            className="w-52"
-          />
-          <Button onClick={handleSave} disabled={!canSave || isSaving}>
-            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-          <ExportNoteMenu title={title} markdown={markdownContent} />
-          <TooltipProvider>
-            <ToggleGroup
-              type="single"
-              value={activeNoteLayout}
-              onValueChange={handleLayoutChange}
-              className="gap-1"
-            >
-              {toggleItems.map(({ value, icon, label }) => (
-                <Tooltip key={value}>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <ToggleGroupItem value={value} aria-label={label}>
-                        {icon}
-                      </ToggleGroupItem>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{label}</TooltipContent>
-                </Tooltip>
-              ))}
-            </ToggleGroup>
-          </TooltipProvider>
-          {(activeNoteLayout === NoteLayout.SOURCE || activeNoteLayout === NoteLayout.DIFF) && (
-            <InsertToolbar onInsert={handleInsertSnippet} />
-          )}
-        </div>
+    <div className="flex h-full min-h-[calc(100svh-8rem)] items-center justify-center p-4">
+      <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm text-muted-foreground backdrop-blur">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Creating your note...
       </div>
-      {activeNoteLayout === NoteLayout.SOURCE && (
-        <NoteEditor value={markdownContent} onChange={setMarkdownContent} />
-      )}
-      {activeNoteLayout === NoteLayout.DIFF && (
-        <NoteDiff value={markdownContent} onChange={setMarkdownContent} />
-      )}
-      {activeNoteLayout === NoteLayout.PREVIEW && <NotePreview markdownContent={markdownContent} />}
-      <Chatbot />
     </div>
   );
 }

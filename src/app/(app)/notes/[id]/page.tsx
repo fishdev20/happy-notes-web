@@ -22,7 +22,7 @@ import useLayoutStore from "@/store/use-layout-store";
 import useNoteStore from "@/store/use-note-store";
 import { Archive, Code, Columns2, Eye, Loader2, Save, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const toggleItems = [
   {
@@ -60,26 +60,44 @@ export default function EditNotePage() {
   const isSaving = updateMutation.isPending;
   const isArchiving = archiveMutation.isPending;
   const isTrashing = trashMutation.isPending;
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedNoteVersionRef = useRef<string | null>(null);
+  const lastPersistedDraftKeyRef = useRef<string | null>(null);
+
+  const normalizedTitle = title.trim() || "Untitled note";
+  const localDraftKey = `${normalizedTitle}::${markdownContent}::${parsedTags.join(",")}`;
+  const currentNoteDraftKey = currentNote
+    ? `${currentNote.title.trim() || "Untitled note"}::${currentNote.content}::${currentNote.tag.join(",")}`
+    : null;
 
   useEffect(() => {
     if (!currentNote) {
       return;
     }
 
-    const nextTagInput = currentNote.tag.join(", ");
-    const shouldSync =
-      title !== currentNote.title ||
-      tagInput !== nextTagInput ||
-      markdownContent !== currentNote.content;
+    if (lastPersistedDraftKeyRef.current === null) {
+      lastPersistedDraftKeyRef.current = currentNoteDraftKey;
+    }
 
-    if (!shouldSync) {
+    const noteVersion = `${currentNote.id}:${currentNote.updatedAt}`;
+    if (lastSyncedNoteVersionRef.current === noteVersion) {
       return;
     }
 
+    // Ignore stale server echoes while user has newer unsaved edits locally.
+    const hasLocalUnsavedChanges =
+      localDraftKey !== (lastPersistedDraftKeyRef.current ?? currentNoteDraftKey);
+    if (hasLocalUnsavedChanges && currentNoteDraftKey !== localDraftKey) {
+      return;
+    }
+
+    lastSyncedNoteVersionRef.current = noteVersion;
+    const nextTagInput = currentNote.tag.join(", ");
     setTitle(currentNote.title);
     setTagInput(nextTagInput);
     setMarkdownContent(currentNote.content);
-  }, [currentNote, markdownContent, setMarkdownContent, tagInput, title]);
+    lastPersistedDraftKeyRef.current = currentNoteDraftKey;
+  }, [currentNote, currentNoteDraftKey, localDraftKey, setMarkdownContent]);
 
   const handleLayoutChange = (layout: NoteLayout | string) => {
     if (
@@ -103,8 +121,77 @@ export default function EditNotePage() {
         content: markdownContent,
         tag: parsedTags,
       },
+      showSuccessToast: true,
     });
+    lastPersistedDraftKeyRef.current = localDraftKey;
   };
+
+  const hasTitleChanged = currentNote ? normalizedTitle !== currentNote.title.trim() : false;
+  const hasContentChanged = currentNote ? markdownContent !== currentNote.content : false;
+  const hasTagsChanged = currentNote
+    ? parsedTags.length !== currentNote.tag.length ||
+      parsedTags.some((tag, index) => tag !== currentNote.tag[index])
+    : false;
+  const hasChanges = hasTitleChanged || hasContentChanged || hasTagsChanged;
+
+  useEffect(() => {
+    if (!currentNote || !hasChanges || isArchiving || isTrashing || updateMutation.isPending) {
+      return;
+    }
+
+    if (localDraftKey === lastPersistedDraftKeyRef.current) {
+      return;
+    }
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      const draftKeyAtSaveStart = localDraftKey;
+      updateMutation
+        .mutateAsync({
+          noteId: currentNote.id,
+          updates: {
+            title: normalizedTitle,
+            content: markdownContent,
+            tag: parsedTags,
+          },
+          showSuccessToast: false,
+        })
+        .then(() => {
+          if (draftKeyAtSaveStart === localDraftKey) {
+            lastPersistedDraftKeyRef.current = draftKeyAtSaveStart;
+          }
+        })
+        .catch((error) => console.error(error));
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [
+    currentNote,
+    hasChanges,
+    isArchiving,
+    isTrashing,
+    localDraftKey,
+    markdownContent,
+    normalizedTitle,
+    parsedTags,
+    title,
+    updateMutation,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleArchive = () => {
     if (!currentNote || isSaving || isArchiving || isTrashing) {
@@ -154,88 +241,92 @@ export default function EditNotePage() {
     );
   }
 
-  const hasTitleChanged = title.trim() !== currentNote.title.trim();
-  const hasContentChanged = markdownContent !== currentNote.content;
-  const hasTagsChanged =
-    parsedTags.length !== currentNote.tag.length ||
-    parsedTags.some((tag, index) => tag !== currentNote.tag[index]);
-  const hasChanges = hasTitleChanged || hasContentChanged || hasTagsChanged;
-
   return (
     <div className="flex flex-col gap-4 h-full min-h-[calc(100svh-4rem-4rem)] relative">
       <div className="sticky top-0 z-10 overflow-x-auto rounded-md border bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex min-w-max items-center gap-2">
-          <Input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Note title"
-            className="w-56"
-          />
-          <Input
-            value={tagInput}
-            onChange={(event) => setTagInput(event.target.value)}
-            placeholder="Tags: meeting, work"
-            className="w-52"
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleArchive}
-                disabled={isSaving || isArchiving || isTrashing}
-                aria-label="Archive note"
-              >
-                {isArchiving ? <Loader2 className="animate-spin" /> : <Archive />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{isArchiving ? "Archiving..." : "Archive"}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleMoveToTrash}
-                disabled={isSaving || isArchiving || isTrashing}
-                aria-label="Move note to trash"
-              >
-                {isTrashing ? <Loader2 className="animate-spin" /> : <Trash2 />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{isTrashing ? "Moving..." : "Trash"}</TooltipContent>
-          </Tooltip>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || isArchiving || isTrashing || !hasChanges}
-          >
-            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-          <ExportNoteMenu title={title || currentNote.title} markdown={markdownContent} />
-          <TooltipProvider>
-            <ToggleGroup
-              type="single"
-              value={activeNoteLayout}
-              onValueChange={handleLayoutChange}
-              className="gap-1"
+        <div className="flex flex-col gap-2">
+          <div className="flex min-w-max items-center gap-2">
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Note title"
+              className="h-9 w-44"
+            />
+            <Input
+              value={tagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              placeholder="Tags: meeting, work"
+              className="h-9 w-44"
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={handleArchive}
+                  disabled={isSaving || isArchiving || isTrashing}
+                  aria-label="Archive note"
+                >
+                  {isArchiving ? <Loader2 className="animate-spin" /> : <Archive />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isArchiving ? "Archiving..." : "Archive"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={handleMoveToTrash}
+                  disabled={isSaving || isArchiving || isTrashing}
+                  aria-label="Move note to trash"
+                >
+                  {isTrashing ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isTrashing ? "Moving..." : "Trash"}</TooltipContent>
+            </Tooltip>
+            <Button
+              className="shrink-0"
+              onClick={handleSave}
+              disabled={isSaving || isArchiving || isTrashing || !hasChanges}
             >
-              {toggleItems.map(({ value, icon, label }) => (
-                <Tooltip key={value}>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <ToggleGroupItem value={value} aria-label={label}>
-                        {icon}
-                      </ToggleGroupItem>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{label}</TooltipContent>
-                </Tooltip>
-              ))}
-            </ToggleGroup>
-          </TooltipProvider>
+              {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+            <div className="shrink-0">
+              <ExportNoteMenu
+                title={title || currentNote.title}
+                markdown={markdownContent}
+                iconOnlyOnMobile
+              />
+            </div>
+            <TooltipProvider>
+              <ToggleGroup
+                type="single"
+                value={activeNoteLayout}
+                onValueChange={handleLayoutChange}
+                className="gap-1 shrink-0"
+              >
+                {toggleItems.map(({ value, icon, label }) => (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <ToggleGroupItem value={value} aria-label={label}>
+                          {icon}
+                        </ToggleGroupItem>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </ToggleGroup>
+            </TooltipProvider>
+          </div>
           {(activeNoteLayout === NoteLayout.SOURCE || activeNoteLayout === NoteLayout.DIFF) && (
-            <InsertToolbar onInsert={handleInsertSnippet} />
+            <InsertToolbar onInsert={handleInsertSnippet} className="w-full" />
           )}
         </div>
       </div>

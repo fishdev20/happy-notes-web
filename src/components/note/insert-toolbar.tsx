@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import {
   Bold,
   Braces,
@@ -17,10 +18,12 @@ import {
   Type,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type InsertToolbarProps = {
   onInsert: (snippet: string) => void;
+  className?: string;
 };
 
 const quickActions = [
@@ -44,28 +47,32 @@ const quickActions = [
   { label: "Divider", icon: Minus, snippet: "---" },
 ];
 
-export default function InsertToolbar({ onInsert }: InsertToolbarProps) {
+export default function InsertToolbar({ onInsert, className }: InsertToolbarProps) {
   return (
-    <div className="min-w-max">
-      <div className="flex items-center gap-1">
-        <TooltipProvider>
-          {quickActions.map(({ label, icon: Icon, snippet }) => (
-            <Tooltip key={label}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onInsert(snippet)}
-                  aria-label={label}
-                >
-                  <Icon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{label}</TooltipContent>
-            </Tooltip>
-          ))}
-        </TooltipProvider>
-      </div>
+    <div className={cn("w-full", className)}>
+      <ScrollArea className="w-full whitespace-nowrap rounded-md border border-border/60 [&_[data-slot=scroll-area-viewport]]:overflow-x-auto [&_[data-slot=scroll-area-viewport]]:overflow-y-hidden [&_[data-slot=scroll-area-viewport]]:touch-pan-x">
+        <div className="flex min-w-max items-center gap-1 p-1">
+          <TooltipProvider>
+            {quickActions.map(({ label, icon: Icon, snippet }) => (
+              <Tooltip key={label}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => onInsert(snippet)}
+                    aria-label={label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+              </Tooltip>
+            ))}
+          </TooltipProvider>
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { useState } from "react";
 type ExportNoteMenuProps = {
   title: string;
   markdown: string;
+  iconOnlyOnMobile?: boolean;
 };
 
 const formats: Array<{ label: string; value: ExportFormat }> = [
@@ -25,7 +26,11 @@ const formats: Array<{ label: string; value: ExportFormat }> = [
   { label: "Markdown (.md)", value: "md" },
 ];
 
-export default function ExportNoteMenu({ title, markdown }: ExportNoteMenuProps) {
+export default function ExportNoteMenu({
+  title,
+  markdown,
+  iconOnlyOnMobile = false,
+}: ExportNoteMenuProps) {
   const [isExporting, setIsExporting] = useState(false);
   const pushToast = useToastStore((state) => state.pushToast);
 
@@ -58,9 +63,14 @@ export default function ExportNoteMenu({ title, markdown }: ExportNoteMenuProps)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={isExporting}>
+        <Button
+          variant="outline"
+          disabled={isExporting}
+          size={iconOnlyOnMobile ? "icon" : "default"}
+          className={iconOnlyOnMobile ? "sm:h-9 sm:w-auto sm:px-3" : undefined}
+        >
           {isExporting ? <Loader2 className="animate-spin" /> : <Download />}
-          Export
+          {iconOnlyOnMobile ? <span className="hidden sm:inline">Export</span> : "Export"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
